@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "snownee.rei_custom_command.mixin",
+  "compatibilityLevel": "JAVA_16",
+  "mixins": [
+  ],
+  "client": [
+    "OverlaySearchFieldMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

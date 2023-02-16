@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "rei-custom-command",
+  "version": "${version}",
+
+  "name": "REI Custom Command",
+  "description": "Allows you to create custom commands into REI favorites",
+  "authors": ["Snownee"],
+  "contact": {
+    "homepage": "https://www.curseforge.com/minecraft/mc-mods/rei-custom-command",
+    "sources": "https://github.com/Snownee/REICustomCommand",
+    "issues": "https://github.com/Snownee/REICustomCommand/issues"
+  },
+
+  "license": "ARR",
+
+  "entrypoints": {
+    "rei_client": [
+      "snownee.rei_custom_command.REICCPlugin"
+    ]
+  },
+  "mixins": ["rei-custom-command.mixins.json"],
+
+  "depends": {
+    "fabric-api": "*",
+    "roughlyenoughitems": "*",
+    "minecraft": ">=1.19.2",
+    "java": ">=17"
+  },
+
+  "custom": {
+    "modmenu": {
+      "links": {
+        "modmenu.discord": "https://discord.gg/rRBvGkz"
+      }
+    }
+  }
+}
