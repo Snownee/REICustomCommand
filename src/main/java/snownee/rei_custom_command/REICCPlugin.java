@@ -12,7 +12,7 @@ import net.minecraft.network.chat.Component;
 public class REICCPlugin implements REIClientPlugin {
 
 	private static final Pattern PATTERN = Pattern.compile("^([^/\\\"][^/]*|\\\".+\\\")?/(.+)$", Pattern.MULTILINE);
-	private static final Pattern FORMATTING_PATTERN = Pattern.compile("\\$([0-9a-f])");
+	private static final Pattern FORMATTING_PATTERN = Pattern.compile("(?i)\\$([0-9A-FK-OR])");
 
 	@Override
 	public void registerFavorites(Registry registry) {
