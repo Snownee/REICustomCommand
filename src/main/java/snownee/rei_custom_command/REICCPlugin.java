@@ -6,9 +6,11 @@ import java.util.regex.Pattern;
 import me.shedaniel.rei.api.client.config.ConfigObject;
 import me.shedaniel.rei.api.client.favorites.FavoriteEntryType.Registry;
 import me.shedaniel.rei.api.client.plugins.REIClientPlugin;
+import me.shedaniel.rei.forge.REIPluginClient;
 import me.shedaniel.rei.impl.client.gui.widget.search.OverlaySearchField;
 import net.minecraft.network.chat.Component;
 
+@REIPluginClient
 public class REICCPlugin implements REIClientPlugin {
 
 	private static final Pattern PATTERN = Pattern.compile("^([^/\\\"][^/]*|\\\".+\\\")?/(.+)$", Pattern.MULTILINE);

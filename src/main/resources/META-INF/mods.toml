@@ -1,0 +1,18 @@
+modLoader="javafml"
+loaderVersion="[42,)"
+license="ARR"
+
+[[mods]]
+modId="rei_custom_command"
+version="${file.jarVersion}"
+displayName="REI Custom Command"
+authors="Snownee"
+displayURL="https://www.curseforge.com/minecraft/mc-mods/rei-custom-command"
+description="Allows you to create custom commands into REI favorites"
+
+[[dependencies.rei_custom_command]]
+modId = "roughlyenoughitems"
+mandatory = true
+versionRange = "[9, )"
+ordering = "NONE"
+side = "BOTH"
