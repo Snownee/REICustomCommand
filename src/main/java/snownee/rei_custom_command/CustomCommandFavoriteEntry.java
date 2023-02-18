@@ -31,7 +31,7 @@ import net.minecraft.util.FormattedCharSequence;
 
 public class CustomCommandFavoriteEntry extends FavoriteEntry {
 
-	public static final ResourceLocation ID = new ResourceLocation("rei-custom-command", "custom-command");
+	public static final ResourceLocation ID = new ResourceLocation("rei_custom_command", "custom-command");
 	public static final String TRANSLATION_KEY = "favorite.section.rei-custom-command";
 	public static final FavoriteEntry DEFAULT = new CustomCommandFavoriteEntry(Component.literal("?"), "");
 

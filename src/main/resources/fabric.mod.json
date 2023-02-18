@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "id": "rei-custom-command",
+  "id": "rei_custom_command",
   "version": "${version}",
 
   "name": "REI Custom Command",
@@ -19,7 +19,7 @@
       "snownee.rei_custom_command.REICCPlugin"
     ]
   },
-  "mixins": ["rei-custom-command.mixins.json"],
+  "mixins": ["rei_custom_command.mixins.json"],
 
   "depends": {
     "fabric-api": "*",
