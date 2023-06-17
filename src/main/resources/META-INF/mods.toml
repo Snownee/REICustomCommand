@@ -1,5 +1,5 @@
 modLoader="javafml"
-loaderVersion="[42,)"
+loaderVersion="[45,)"
 license="ARR"
 
 [[mods]]
@@ -13,6 +13,6 @@ description="Allows you to create custom commands into REI favorites"
 [[dependencies.rei_custom_command]]
 modId = "roughlyenoughitems"
 mandatory = true
-versionRange = "[9, )"
+versionRange = "[12, )"
 ordering = "NONE"
 side = "BOTH"

@@ -44,7 +44,7 @@ minecraft {
     //
     // Use non-default mappings at your own risk. They may not always work.
     // Simply re-run your setup task after changing the mappings to update your workspace.
-    mappings channel: mappings_channel, version: mappings_version
+    mappings channel: mappings_channel, version: minecraft_version
 
     //accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg') // Currently, this location cannot be changed from the default.
 
@@ -247,12 +247,12 @@ modrinth {
     versionNumber = project.mod_version // You don't need to set this manually. Will fail if Modrinth has this version already
     versionType = "release" // This is the default -- can also be `beta` or `alpha`
     uploadFile = jar // With Loom, this MUST be set to `remapJar` instead of `jar`!
-    gameVersions = ["1.19.2"] // Must be an array, even with only one version
+    gameVersions = ["1.20", "1.20.1"] // Must be an array, even with only one version
     loaders = ["forge"] // Must also be an array - no need to specify this if you're using Loom or ForgeGradle
     dependencies { // A special DSL for creating dependencies
         // scope.type
         // The scope can be `required`, `optional`, `incompatible`, or `embedded`
         // The type can either be `project` or `version`
-        required.project "roughly-enough-items"
+        required.project "rei"
     }
 }
