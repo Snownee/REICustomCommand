@@ -1,26 +1,23 @@
 package snownee.rei_custom_command;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Lifecycle;
 
-import dev.architectury.platform.Platform;
 import me.shedaniel.math.Rectangle;
 import me.shedaniel.rei.api.client.favorites.FavoriteEntry;
 import me.shedaniel.rei.api.client.favorites.FavoriteEntryType;
-import me.shedaniel.rei.api.client.gui.AbstractRenderer;
 import me.shedaniel.rei.api.client.gui.Renderer;
 import me.shedaniel.rei.api.client.gui.widgets.Tooltip;
 import me.shedaniel.rei.api.client.gui.widgets.TooltipContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.nbt.CompoundTag;
@@ -50,9 +47,9 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 
 	@Override
 	public Renderer getRenderer(boolean showcase) {
-		return new AbstractRenderer() {
+		return new Renderer() {
 			@Override
-			public void render(PoseStack matrices, Rectangle bounds, int mouseX, int mouseY, float delta) {
+			public void render(GuiGraphics graphics, Rectangle bounds, int mouseX, int mouseY, float delta) {
 				int color = bounds.contains(mouseX, mouseY) ? 0xFFEEEEEE : 0xFFAAAAAA;
 				if (bounds.width > 4 && bounds.height > 4) {
 					Font font = Minecraft.getInstance().font;
@@ -60,11 +57,12 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 					List<FormattedCharSequence> lines = font.split(component, bounds.getWidth());
 					if (lines.isEmpty())
 						return;
-					matrices.pushPose();
-					matrices.translate(bounds.getCenterX(), bounds.getCenterY(), 0);
-					matrices.scale(bounds.getWidth() / 18f, bounds.getHeight() / 18f, 1);
-					font.draw(matrices, lines.get(0), -font.width(lines.get(0)) / 2f + 0.5f, -3.5f, color);
-					matrices.popPose();
+					graphics.pose().pushPose();
+					graphics.pose().translate(bounds.getCenterX(), bounds.getCenterY(), 0);
+					graphics.pose().scale(bounds.getWidth() / 18f, bounds.getHeight() / 18f, 1);
+					graphics.pose().translate(-font.width(lines.get(0)) / 2f + 0.5f, -3.5f, 0);
+					graphics.drawString(font, lines.get(0), 0, 0, color, false);
+					graphics.pose().popPose();
 				}
 			}
 
@@ -106,7 +104,7 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 	public boolean doAction(int button) {
 		if (button != 0)
 			return false;
-		CommandSender.sendCommand(command);
+		Minecraft.getInstance().player.connection.sendCommand(command);
 		Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
 		return true;
 	}
@@ -145,7 +143,7 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 			} catch (Exception exception) {
 			}
 			if (title == null) {
-				return DataResult.error("Cannot create CustomCommandFavoriteEntry!");
+				return DataResult.error(() -> "Cannot create CustomCommandFavoriteEntry!");
 			}
 			return DataResult.success(new CustomCommandFavoriteEntry(title, command), Lifecycle.stable());
 		}
@@ -153,7 +151,7 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 		@Override
 		public DataResult<CustomCommandFavoriteEntry> fromArgs(Object... args) {
 			if (args.length < 2 || !(args[0] instanceof Component title) || !(args[0] instanceof String command))
-				return DataResult.error("Cannot create CustomCommandFavoriteEntry!");
+				return DataResult.error(() -> "Cannot create CustomCommandFavoriteEntry!");
 			return DataResult.success(new CustomCommandFavoriteEntry(title, command), Lifecycle.stable());
 		}
 
@@ -162,16 +160,6 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 			tag.putString("title", Component.Serializer.toJson(entry.title));
 			tag.putString("command", entry.command);
 			return tag;
-		}
-	}
-
-	class CommandSender {
-		static void sendCommand(String command) {
-			try {
-				Class.forName("me.shedaniel.rei.impl.client.%s.CommandSenderImpl".formatted(Platform.isForge() ? "forge" : "fabric")).getDeclaredMethod("sendCommand", String.class).invoke(null, command);
-			} catch (IllegalAccessException | ClassNotFoundException | NoSuchMethodException | InvocationTargetException e) {
-				throw new RuntimeException(e);
-			}
 		}
 	}
 }
