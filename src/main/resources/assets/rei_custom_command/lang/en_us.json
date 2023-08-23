@@ -1,4 +1,5 @@
 {
   "favorite.section.rei-custom-command": "Custom Command",
-  "favorite.section.rei-custom-command.tip": "To add a command,\nsimply type the command in the search bar (starting with \"/\") and press enter.\nTo name a bookmark,\ntype some words in front of \"/\" when adding the bookmark.\n(can use \"$\" for formatting codes)"
+  "favorite.section.rei-custom-command.tip": "To add a command,\nsimply type the command in the search bar (starting with \"/\") and press enter.\nTo name a bookmark,\ntype some words in front of \"/\" when adding the bookmark.\n(can use \"$\" for formatting codes)",
+  "rei-custom-command.sth-wrong": "Something went wrong."
 }
