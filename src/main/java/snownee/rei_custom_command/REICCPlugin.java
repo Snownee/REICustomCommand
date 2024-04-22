@@ -70,7 +70,8 @@ public class REICCPlugin implements REIClientPlugin {
 				if (icon.isEmpty()) {
 					Minecraft mc = Minecraft.getInstance();
 					SystemToast.SystemToastIds ids = SystemToast.SystemToastIds.UNSECURE_SERVER_WARNING; // make the toast persists longer
-					SystemToast toast = SystemToast.multiline(mc,
+					SystemToast toast = SystemToast.multiline(
+							mc,
 							ids,
 							Component.translatable("rei_custom_command.sth-wrong"),
 							Component.literal(e.getLocalizedMessage()));

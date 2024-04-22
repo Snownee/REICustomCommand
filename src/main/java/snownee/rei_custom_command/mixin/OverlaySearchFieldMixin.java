@@ -14,8 +14,9 @@ public abstract class OverlaySearchFieldMixin {
 
 	@Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true, remap = true)
 	private void reicc_keyPressed(int keyCode, int scanCode, int modifiers, CallbackInfoReturnable<Boolean> ci) {
-		if (REICCPlugin.onPressEnterInSearch((OverlaySearchField) (Object) this, keyCode))
+		if (REICCPlugin.onPressEnterInSearch((OverlaySearchField) (Object) this, keyCode)) {
 			ci.setReturnValue(true);
+		}
 	}
 
 }
