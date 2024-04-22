@@ -2,12 +2,14 @@ package snownee.rei_custom_command;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.google.common.base.Suppliers;
+import com.google.common.collect.Lists;
 import com.mojang.serialization.DataResult;
-import com.mojang.serialization.Lifecycle;
 
 import me.shedaniel.math.Rectangle;
 import me.shedaniel.rei.api.client.favorites.FavoriteEntry;
@@ -22,27 +24,35 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
+@SuppressWarnings("UnstableApiUsage")
 public class CustomCommandFavoriteEntry extends FavoriteEntry {
 
 	public static final ResourceLocation ID = new ResourceLocation("rei_custom_command", "custom-command");
-	public static final String TRANSLATION_KEY = "favorite.section.rei-custom-command";
-	public static final FavoriteEntry DEFAULT = new CustomCommandFavoriteEntry(Component.literal("?"), Items.COMMAND_BLOCK.getDefaultInstance(), "");
+	public static final String TRANSLATION_KEY = "favorite.section.rei_custom_command";
+	public static final FavoriteEntry DEFAULT = new CustomCommandFavoriteEntry(Component.literal("?"),
+			Items.COMMAND_BLOCK.getDefaultInstance(),
+			List.of());
 
 	private final Component title;
 	private final ItemStack icon;
-	private final String command;
+	private final List<String> commands;
 
-	public CustomCommandFavoriteEntry(Component title, ItemStack icon, String command) {
+	public CustomCommandFavoriteEntry(Component title, ItemStack icon, List<String> commands) {
 		this.title = title;
 		this.icon = icon;
-		this.command = command;
+		this.commands = commands;
 	}
 
 	@Override
@@ -53,17 +63,45 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 	@Override
 	public Renderer getRenderer(boolean showcase) {
 		return new Renderer() {
+			private final Supplier<List<Component>> tooltip = Suppliers.memoize(() -> {
+				Font font = Minecraft.getInstance().font;
+				if (CustomCommandFavoriteEntry.this.equals(DEFAULT)) {
+					return Stream.of(I18n.get(TRANSLATION_KEY + ".tip").split("\n"))
+							.flatMap(s -> font.getSplitter().splitLines(FormattedText.of(s),
+									300,
+									Style.EMPTY).stream().map(FormattedText::getString))
+							.map(Component::literal)
+							.map(Component.class::cast)
+							.toList();
+				} else {
+					List<Component> tooltip = Lists.newArrayList();
+					if (!title.getString().isBlank()) {
+						tooltip.add(title);
+					}
+					for (String command : commands) {
+						String cutCommand = "/" + font.plainSubstrByWidth(command, 195);
+						if (cutCommand.length() < command.length()) {
+							cutCommand += "...";
+						}
+						tooltip.add(Component.literal(cutCommand));
+					}
+					return tooltip;
+				}
+			});
+
 			@Override
 			public void render(GuiGraphics graphics, Rectangle bounds, int mouseX, int mouseY, float delta) {
-				if (bounds.width < 5 || bounds.height < 5)
+				if (bounds.width < 5 || bounds.height < 5) {
 					return;
+				}
 				if (icon.isEmpty()) {
 					int color = bounds.contains(mouseX, mouseY) ? 0xFFEEEEEE : 0xFFAAAAAA;
 					Font font = Minecraft.getInstance().font;
-					Component component = title.getString().isBlank() ? Component.literal(command) : title;
+					Component component = title.getString().isBlank() ? Component.literal(commands.get(0)) : title;
 					List<FormattedCharSequence> lines = font.split(component, bounds.getWidth());
-					if (lines.isEmpty())
+					if (lines.isEmpty()) {
 						return;
+					}
 					graphics.pose().pushPose();
 					graphics.pose().translate(bounds.getCenterX(), bounds.getCenterY(), 0);
 					graphics.pose().scale(bounds.getWidth() / 18f, bounds.getHeight() / 18f, 1);
@@ -75,7 +113,8 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 					graphics.pose().translate(bounds.getMinX(), bounds.getMinY(), 0);
 					graphics.pose().scale(bounds.getWidth() / 16f, bounds.getHeight() / 16f, 1);
 					graphics.renderItem(icon, 0, 0);
-					if (!Screen.hasControlDown() && !icon.is(Items.COMMAND_BLOCK) && !icon.is(Items.REPEATING_COMMAND_BLOCK) && !icon.is(Items.CHAIN_COMMAND_BLOCK)) {
+					if (!Screen.hasControlDown() && !icon.is(Items.COMMAND_BLOCK) && !icon.is(Items.REPEATING_COMMAND_BLOCK) && !icon.is(
+							Items.CHAIN_COMMAND_BLOCK)) {
 						graphics.pose().scale(0.5f, 0.5f, 1);
 						graphics.renderItem(Items.COMMAND_BLOCK.getDefaultInstance(), 16, 16, 0, 30);
 					}
@@ -86,27 +125,17 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 			@Override
 			@Nullable
 			public Tooltip getTooltip(TooltipContext context) {
-				List<Component> tooltip;
-				if (CustomCommandFavoriteEntry.this.equals(DEFAULT)) {
-					tooltip = Stream.of(I18n.get(TRANSLATION_KEY + ".tip").split("\n")).map(Component::literal).map(Component.class::cast).toList();
-				} else {
-					Font font = Minecraft.getInstance().font;
-					String cutCommand = "/" + font.plainSubstrByWidth(command, 200);
-					if (title.getString().isBlank()) {
-						tooltip = List.of(Component.literal(cutCommand));
-					} else {
-						tooltip = List.of(title, Component.literal(cutCommand));
-					}
-				}
-				return Tooltip.create(context.getPoint(), tooltip);
+				return Tooltip.create(context.getPoint(), tooltip.get());
 			}
 
 			@Override
 			public boolean equals(Object o) {
-				if (this == o)
+				if (this == o) {
 					return true;
-				if (o == null || getClass() != o.getClass())
+				}
+				if (o == null || getClass() != o.getClass()) {
 					return false;
+				}
 				return hashCode() == o.hashCode();
 			}
 
@@ -119,16 +148,22 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 
 	@Override
 	public boolean doAction(int button) {
-		if (button != 0)
+		if (button != 0) {
 			return false;
-		Minecraft.getInstance().player.connection.sendCommand(command);
+		}
+		if (Minecraft.getInstance().player == null) {
+			return false;
+		}
+		for (String command : commands) {
+			Minecraft.getInstance().player.connection.sendCommand(command);
+		}
 		Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
 		return true;
 	}
 
 	@Override
 	public long hashIgnoreAmount() {
-		return Objects.hash(title, command);
+		return Objects.hash(title, icon.getItem(), icon.getTag(), commands);
 	}
 
 	@Override
@@ -143,9 +178,11 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 
 	@Override
 	public boolean isSame(FavoriteEntry other) {
-		if (!(other instanceof CustomCommandFavoriteEntry that))
+		if (!(other instanceof CustomCommandFavoriteEntry that)) {
 			return false;
-		return Objects.equals(title, that.title) && Objects.equals(command, that.command);
+		}
+		return Objects.equals(title, that.title) && ItemStack.isSameItemSameTags(icon, that.icon) && Objects.equals(commands,
+				that.commands);
 	}
 
 	public enum Type implements FavoriteEntryType<CustomCommandFavoriteEntry> {
@@ -153,7 +190,13 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 
 		@Override
 		public DataResult<CustomCommandFavoriteEntry> read(CompoundTag tag) {
-			String command = tag.getString("command");
+			List<String> commands;
+			if (tag.contains("command", Tag.TAG_STRING)) {
+				commands = List.of(tag.getString("command"));
+			} else {
+				ListTag commandsTag = tag.getList("commands", Tag.TAG_STRING);
+				commands = commandsTag.stream().map(Tag::getAsString).toList();
+			}
 			Component title = null;
 			ItemStack icon = ItemStack.EMPTY;
 			try {
@@ -166,23 +209,34 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 			if (title == null) {
 				return DataResult.error(() -> "Cannot create CustomCommandFavoriteEntry!");
 			}
-			return DataResult.success(new CustomCommandFavoriteEntry(title, icon, command), Lifecycle.stable());
+			return DataResult.success(new CustomCommandFavoriteEntry(title, icon, commands));
 		}
 
 		@Override
 		public DataResult<CustomCommandFavoriteEntry> fromArgs(Object... args) {
-			if (args.length < 2 || !(args[0] instanceof Component title) || !(args[1] instanceof String command))
+			if (args.length < 3 || !(args[0] instanceof Component title) || !(args[1] instanceof ItemStack icon)) {
 				return DataResult.error(() -> "Cannot create CustomCommandFavoriteEntry!");
-			return DataResult.success(new CustomCommandFavoriteEntry(title, ItemStack.EMPTY, command), Lifecycle.stable());
+			}
+			List<String> commands;
+			try {
+				commands = Stream.of(args).skip(2).map(String.class::cast).toList();
+			} catch (Exception e) {
+				return DataResult.error(() -> "Cannot create CustomCommandFavoriteEntry!");
+			}
+			return DataResult.success(new CustomCommandFavoriteEntry(title, icon, commands));
 		}
 
 		@Override
 		public CompoundTag save(CustomCommandFavoriteEntry entry, CompoundTag tag) {
 			tag.putString("title", Component.Serializer.toJson(entry.title));
-			tag.putString("command", entry.command);
 			if (!entry.icon.isEmpty()) {
 				tag.put("item", entry.icon.save(new CompoundTag()));
 			}
+			ListTag commands = new ListTag();
+			for (String command : entry.commands) {
+				commands.add(StringTag.valueOf(command));
+			}
+			tag.put("commands", commands);
 			return tag;
 		}
 	}
