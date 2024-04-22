@@ -41,7 +41,8 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 
 	public static final ResourceLocation ID = new ResourceLocation("rei_custom_command", "custom-command");
 	public static final String TRANSLATION_KEY = "favorite.section.rei_custom_command";
-	public static final FavoriteEntry DEFAULT = new CustomCommandFavoriteEntry(Component.literal("?"),
+	public static final FavoriteEntry DEFAULT = new CustomCommandFavoriteEntry(
+			Component.literal("?"),
 			Items.COMMAND_BLOCK.getDefaultInstance(),
 			List.of());
 
@@ -67,7 +68,8 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 				Font font = Minecraft.getInstance().font;
 				if (CustomCommandFavoriteEntry.this.equals(DEFAULT)) {
 					return Stream.of(I18n.get(TRANSLATION_KEY + ".tip").split("\n"))
-							.flatMap(s -> font.getSplitter().splitLines(FormattedText.of(s),
+							.flatMap(s -> font.getSplitter().splitLines(
+									FormattedText.of(s),
 									300,
 									Style.EMPTY).stream().map(FormattedText::getString))
 							.map(Component::literal)
@@ -181,7 +183,8 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 		if (!(other instanceof CustomCommandFavoriteEntry that)) {
 			return false;
 		}
-		return Objects.equals(title, that.title) && ItemStack.isSameItemSameTags(icon, that.icon) && Objects.equals(commands,
+		return Objects.equals(title, that.title) && ItemStack.isSameItemSameTags(icon, that.icon) && Objects.equals(
+				commands,
 				that.commands);
 	}
 
