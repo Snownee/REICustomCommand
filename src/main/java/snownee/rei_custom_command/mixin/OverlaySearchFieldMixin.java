@@ -8,6 +8,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import me.shedaniel.rei.impl.client.gui.widget.search.OverlaySearchField;
 import snownee.rei_custom_command.REICCPlugin;
 
+@SuppressWarnings("UnstableApiUsage")
 @Mixin(value = OverlaySearchField.class, remap = false)
 public abstract class OverlaySearchFieldMixin {
 

@@ -1,10 +1,12 @@
 package snownee.rei_custom_command;
 
-import java.util.regex.Matcher;
+import java.util.List;
 import java.util.regex.Pattern;
 
+import com.google.common.collect.Lists;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.serialization.JsonOps;
 
 import me.shedaniel.rei.api.client.config.ConfigObject;
@@ -16,75 +18,138 @@ import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.world.item.ItemStack;
 
+@SuppressWarnings("UnstableApiUsage")
 public class REICCPlugin implements REIClientPlugin {
 
-	private static final Pattern PATTERN = Pattern.compile("^([^/\\\"][^/]*|\\\".+\\\")?/(.+)$", Pattern.MULTILINE);
 	private static final Pattern FORMATTING_PATTERN = Pattern.compile("(?i)\\$([0-9A-FK-OR])");
 
 	public static boolean onPressEnterInSearch(OverlaySearchField searchField, int keyCode) {
-		if (keyCode != 257 && keyCode != 335) {
+		if (keyCode != InputConstants.KEY_RETURN && keyCode != InputConstants.KEY_NUMPADENTER) {
 			return false;
 		}
 		if (!searchField.isVisible() || !searchField.isFocused() || !ConfigObject.getInstance().isFavoritesEnabled()) {
 			return false;
 		}
-		Matcher matcher = PATTERN.matcher(searchField.getText());
-		if (!matcher.find()) {
+		ParsedResult result = parse(searchField.getText());
+		if (result == null) {
 			return false;
 		}
-		String titleStr = matcher.group(1);
-		String command = matcher.group(2);
+		if (result.commands.size() > 10) {
+			MutableComponent component = Component.translatable("rei_custom_command.too-many_commands");
+			SystemToast.addOrUpdate(Minecraft.getInstance().getToasts(), SystemToast.SystemToastIds.PACK_LOAD_FAILURE, component, null);
+			return true;
+		}
+		String titleStr = result.title();
 		ItemStack icon = ItemStack.EMPTY;
 		Component title;
-		if (titleStr != null) {
-			if (titleStr.startsWith("{")) {
-				try {
-					JsonObject jsonObject = GsonHelper.parse(titleStr, true);
-					if (jsonObject.has("item")) {
-						JsonElement element = jsonObject.get("item");
-						if (element.isJsonPrimitive()) {
-							icon = BuiltInRegistries.ITEM.get(new ResourceLocation(element.getAsString())).getDefaultInstance();
-						} else {
-							JsonObject itemObject = element.getAsJsonObject();
-							if (!itemObject.has("Count")) {
-								itemObject.addProperty("Count", 1);
-							}
-							icon = ItemStack.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow(false, e -> {
-							});
+		if (titleStr.isEmpty()) {
+			title = Component.empty();
+		} else if (titleStr.startsWith("{")) {
+			try {
+				JsonObject jsonObject = GsonHelper.parse(titleStr, true);
+				if (jsonObject.has("item")) {
+					JsonElement element = jsonObject.get("item");
+					if (element.isJsonPrimitive()) {
+						icon = BuiltInRegistries.ITEM.get(new ResourceLocation(element.getAsString())).getDefaultInstance();
+					} else {
+						JsonObject itemObject = element.getAsJsonObject();
+						if (!itemObject.has("Count")) {
+							itemObject.addProperty("Count", 1);
 						}
+						icon = ItemStack.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow(false, e -> {
+						});
 					}
-					title = Component.Serializer.fromJson(jsonObject);
-				} catch (Exception e) {
-					if (icon.isEmpty()) {
-						Minecraft mc = Minecraft.getInstance();
-						SystemToast.SystemToastIds ids = SystemToast.SystemToastIds.UNSECURE_SERVER_WARNING; // make the toast persists longer
-						SystemToast toast = SystemToast.multiline(mc, ids, Component.translatable("rei-custom-command.sth-wrong"), Component.literal(e.getLocalizedMessage()));
-						mc.getToasts().addToast(toast);
-						return false;
-					}
-					title = Component.empty();
 				}
-			} else {
-				title = Component.literal(FORMATTING_PATTERN.matcher(titleStr).replaceAll("§$1"));
+				title = Component.Serializer.fromJson(jsonObject);
+			} catch (Exception e) {
+				if (icon.isEmpty()) {
+					Minecraft mc = Minecraft.getInstance();
+					SystemToast.SystemToastIds ids = SystemToast.SystemToastIds.UNSECURE_SERVER_WARNING; // make the toast persists longer
+					SystemToast toast = SystemToast.multiline(mc,
+							ids,
+							Component.translatable("rei_custom_command.sth-wrong"),
+							Component.literal(e.getLocalizedMessage()));
+					mc.getToasts().addToast(toast);
+					return false;
+				}
+				title = Component.empty();
 			}
 		} else {
-			title = Component.empty();
+			title = Component.literal(FORMATTING_PATTERN.matcher(titleStr).replaceAll("§$1"));
 		}
-		CustomCommandFavoriteEntry entry = new CustomCommandFavoriteEntry(title, icon, command);
+		CustomCommandFavoriteEntry entry = new CustomCommandFavoriteEntry(title, icon, result.commands());
 		ConfigObject.getInstance().getFavoriteEntries().add(entry);
-		if (!Screen.hasControlDown())
+		if (!Screen.hasControlDown()) {
 			searchField.setText("");
+		}
 		return true;
 	}
 
 	@Override
 	public void registerFavorites(Registry registry) {
 		registry.register(CustomCommandFavoriteEntry.ID, CustomCommandFavoriteEntry.Type.INSTANCE);
-		registry.getOrCrateSection(Component.translatable(CustomCommandFavoriteEntry.TRANSLATION_KEY)).add(CustomCommandFavoriteEntry.DEFAULT);
+		registry.getOrCrateSection(Component.translatable(CustomCommandFavoriteEntry.TRANSLATION_KEY))
+				.add(CustomCommandFavoriteEntry.DEFAULT);
 	}
 
+	public static ParsedResult parse(String input) {
+		List<String> instructions = Lists.newArrayList();
+		StringBuilder currentInstruction = new StringBuilder();
+		boolean inDoubleQuotes = false;
+		boolean escapeNext = false;
+
+		for (char c : input.toCharArray()) {
+			if (escapeNext) {
+				currentInstruction.append(c);
+				escapeNext = false;
+				continue;
+			}
+
+			if (c == '\\') {
+				escapeNext = true;
+				continue;
+			}
+
+			if (c == '"') {
+				inDoubleQuotes = !inDoubleQuotes;
+				currentInstruction.append(c);
+				continue;
+			}
+
+			if (c == '/' && !inDoubleQuotes) {
+				instructions.add(currentInstruction.toString().trim());
+				currentInstruction = new StringBuilder();
+				continue;
+			}
+
+			currentInstruction.append(c);
+		}
+
+		if (escapeNext) {
+			currentInstruction.append('\\');
+		}
+
+		if (!currentInstruction.isEmpty()) {
+			instructions.add(currentInstruction.toString().trim());
+		}
+
+		if (instructions.size() < 2) {
+			return null;
+		}
+
+		for (int i = 1; i < instructions.size(); i++) {
+			if (instructions.get(i).isEmpty()) {
+				return null;
+			}
+		}
+
+		return new ParsedResult(instructions.get(0), instructions.subList(1, instructions.size()));
+	}
+
+	public record ParsedResult(String title, List<String> commands) {}
 }
