@@ -2,7 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "snownee.rei_custom_command.mixin",
-  "compatibilityLevel": "JAVA_16",
+  "compatibilityLevel": "JAVA_21",
   "refmap": "rei_custom_command.refmap.json",
   "mixins": [
   ],

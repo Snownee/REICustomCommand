@@ -4,11 +4,11 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import com.google.common.collect.Lists;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.serialization.JsonOps;
+import com.mojang.brigadier.StringReader;
 
+import me.shedaniel.rei.RoughlyEnoughItemsCore;
 import me.shedaniel.rei.api.client.config.ConfigObject;
 import me.shedaniel.rei.api.client.favorites.FavoriteEntryType.Registry;
 import me.shedaniel.rei.api.client.plugins.REIClientPlugin;
@@ -16,10 +16,11 @@ import me.shedaniel.rei.impl.client.gui.widget.search.OverlaySearchField;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.commands.arguments.item.ItemParser;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.world.item.ItemStack;
 
@@ -41,7 +42,7 @@ public class REICCPlugin implements REIClientPlugin {
 		}
 		if (result.commands.size() > 10) {
 			MutableComponent component = Component.translatable("rei_custom_command.too-many_commands");
-			SystemToast.addOrUpdate(Minecraft.getInstance().getToasts(), SystemToast.SystemToastIds.PACK_LOAD_FAILURE, component, null);
+			SystemToast.addOrUpdate(Minecraft.getInstance().getToasts(), SystemToast.SystemToastId.PACK_LOAD_FAILURE, component, null);
 			return true;
 		}
 		String titleStr = result.title();
@@ -51,31 +52,28 @@ public class REICCPlugin implements REIClientPlugin {
 			title = Component.empty();
 		} else if (titleStr.startsWith("{")) {
 			try {
+				RegistryAccess.Frozen provider = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
 				JsonObject jsonObject = GsonHelper.parse(titleStr, true);
 				if (jsonObject.has("item")) {
-					JsonElement element = jsonObject.get("item");
-					if (element.isJsonPrimitive()) {
-						icon = BuiltInRegistries.ITEM.get(new ResourceLocation(element.getAsString())).getDefaultInstance();
-					} else {
-						JsonObject itemObject = element.getAsJsonObject();
-						if (!itemObject.has("Count")) {
-							itemObject.addProperty("Count", 1);
-						}
-						icon = ItemStack.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow(false, e -> {
-						});
-					}
+					ItemParser parser = new ItemParser(provider);
+					ItemParser.ItemResult itemResult = parser.parse(new StringReader(jsonObject.get("item").getAsString()));
+					icon = new ItemStack(itemResult.item(), 1, itemResult.components());
 				}
-				title = Component.Serializer.fromJson(jsonObject);
+				title = Component.Serializer.fromJson(jsonObject, provider);
+				if (title == null) {
+					title = Component.empty();
+				}
 			} catch (Exception e) {
 				if (icon.isEmpty()) {
 					Minecraft mc = Minecraft.getInstance();
-					SystemToast.SystemToastIds ids = SystemToast.SystemToastIds.UNSECURE_SERVER_WARNING; // make the toast persists longer
+					SystemToast.SystemToastId ids = SystemToast.SystemToastId.UNSECURE_SERVER_WARNING; // make the toast persists longer
 					SystemToast toast = SystemToast.multiline(
 							mc,
 							ids,
 							Component.translatable("rei_custom_command.sth-wrong"),
 							Component.literal(e.getLocalizedMessage()));
 					mc.getToasts().addToast(toast);
+					RoughlyEnoughItemsCore.LOGGER.error("Failed to parse custom command favorite entry title as JSON", e);
 					return false;
 				}
 				title = Component.empty();
@@ -149,7 +147,7 @@ public class REICCPlugin implements REIClientPlugin {
 			}
 		}
 
-		return new ParsedResult(instructions.get(0), instructions.subList(1, instructions.size()));
+		return new ParsedResult(instructions.getFirst(), instructions.subList(1, instructions.size()));
 	}
 
 	public record ParsedResult(String title, List<String> commands) {}

@@ -23,6 +23,8 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -39,7 +41,7 @@ import net.minecraft.world.item.Items;
 @SuppressWarnings("UnstableApiUsage")
 public class CustomCommandFavoriteEntry extends FavoriteEntry {
 
-	public static final ResourceLocation ID = new ResourceLocation("rei_custom_command", "custom-command");
+	public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath("rei_custom_command", "custom-command");
 	public static final String TRANSLATION_KEY = "favorite.section.rei_custom_command";
 	public static final FavoriteEntry DEFAULT = new CustomCommandFavoriteEntry(
 			Component.literal("?"),
@@ -99,7 +101,7 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 				if (icon.isEmpty()) {
 					int color = bounds.contains(mouseX, mouseY) ? 0xFFEEEEEE : 0xFFAAAAAA;
 					Font font = Minecraft.getInstance().font;
-					Component component = title.getString().isBlank() ? Component.literal(commands.get(0)) : title;
+					Component component = title.getString().isBlank() ? Component.literal(commands.getFirst()) : title;
 					List<FormattedCharSequence> lines = font.split(component, bounds.getWidth());
 					if (lines.isEmpty()) {
 						return;
@@ -107,8 +109,8 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 					graphics.pose().pushPose();
 					graphics.pose().translate(bounds.getCenterX(), bounds.getCenterY(), 0);
 					graphics.pose().scale(bounds.getWidth() / 18f, bounds.getHeight() / 18f, 1);
-					graphics.pose().translate(-font.width(lines.get(0)) / 2f + 0.5f, -3.5f, 0);
-					graphics.drawString(font, lines.get(0), 0, 0, color, false);
+					graphics.pose().translate(-font.width(lines.getFirst()) / 2f + 0.5f, -3.5f, 0);
+					graphics.drawString(font, lines.getFirst(), 0, 0, color, false);
 					graphics.pose().popPose();
 				} else {
 					graphics.pose().pushPose();
@@ -165,7 +167,7 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 
 	@Override
 	public long hashIgnoreAmount() {
-		return Objects.hash(title, icon.getItem(), icon.getTag(), commands);
+		return Objects.hash(title, icon.getItem(), icon.getComponents(), commands);
 	}
 
 	@Override
@@ -183,7 +185,7 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 		if (!(other instanceof CustomCommandFavoriteEntry that)) {
 			return false;
 		}
-		return Objects.equals(title, that.title) && ItemStack.isSameItemSameTags(icon, that.icon) && Objects.equals(
+		return Objects.equals(title, that.title) && ItemStack.isSameItemSameComponents(icon, that.icon) && Objects.equals(
 				commands,
 				that.commands);
 	}
@@ -192,20 +194,21 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 		INSTANCE;
 
 		@Override
-		public DataResult<CustomCommandFavoriteEntry> read(CompoundTag tag) {
+		public DataResult<CustomCommandFavoriteEntry> read(CompoundTag object) {
 			List<String> commands;
-			if (tag.contains("command", Tag.TAG_STRING)) {
-				commands = List.of(tag.getString("command"));
+			if (object.contains("command", Tag.TAG_STRING)) {
+				commands = List.of(object.getString("command"));
 			} else {
-				ListTag commandsTag = tag.getList("commands", Tag.TAG_STRING);
+				ListTag commandsTag = object.getList("commands", Tag.TAG_STRING);
 				commands = commandsTag.stream().map(Tag::getAsString).toList();
 			}
 			Component title = null;
 			ItemStack icon = ItemStack.EMPTY;
 			try {
-				title = Component.Serializer.fromJson(tag.getString("title"));
-				if (tag.contains("item")) {
-					icon = ItemStack.of(tag.getCompound("item"));
+				RegistryAccess.Frozen provider = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+				title = Component.Serializer.fromJson(object.getString("title"), provider);
+				if (object.contains("item")) {
+					icon = ItemStack.parseOptional(provider, object.getCompound("item"));
 				}
 			} catch (Exception ignored) {
 			}
@@ -231,9 +234,10 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 
 		@Override
 		public CompoundTag save(CustomCommandFavoriteEntry entry, CompoundTag tag) {
-			tag.putString("title", Component.Serializer.toJson(entry.title));
+			RegistryAccess.Frozen provider = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+			tag.putString("title", Component.Serializer.toJson(entry.title, provider));
 			if (!entry.icon.isEmpty()) {
-				tag.put("item", entry.icon.save(new CompoundTag()));
+				tag.put("item", entry.icon.save(provider));
 			}
 			ListTag commands = new ListTag();
 			for (String command : entry.commands) {
