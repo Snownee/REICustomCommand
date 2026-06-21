@@ -4,9 +4,13 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import com.google.common.collect.Lists;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.google.gson.Strictness;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.brigadier.StringReader;
+import com.mojang.serialization.JsonOps;
 
 import me.shedaniel.rei.RoughlyEnoughItemsCore;
 import me.shedaniel.rei.api.client.config.ConfigObject;
@@ -15,19 +19,22 @@ import me.shedaniel.rei.api.client.plugins.REIClientPlugin;
 import me.shedaniel.rei.impl.client.gui.widget.search.OverlaySearchField;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.commands.arguments.item.ItemInput;
 import net.minecraft.commands.arguments.item.ItemParser;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.util.GsonHelper;
+import net.minecraft.util.Util;
 import net.minecraft.world.item.ItemStack;
 
 @SuppressWarnings("UnstableApiUsage")
 public class REICCPlugin implements REIClientPlugin {
 
+	private static final boolean ON_OSX = Util.getPlatform() == Util.OS.OSX;
 	private static final Pattern FORMATTING_PATTERN = Pattern.compile("(?i)\\$([0-9A-FK-OR])");
+	private static final Gson GSON = new GsonBuilder().setStrictness(Strictness.LENIENT).create();
 
 	public static boolean onPressEnterInSearch(OverlaySearchField searchField, int keyCode) {
 		if (keyCode != InputConstants.KEY_RETURN && keyCode != InputConstants.KEY_NUMPADENTER) {
@@ -42,7 +49,11 @@ public class REICCPlugin implements REIClientPlugin {
 		}
 		if (result.commands.size() > 10) {
 			MutableComponent component = Component.translatable("rei_custom_command.too-many_commands");
-			SystemToast.addOrUpdate(Minecraft.getInstance().getToasts(), SystemToast.SystemToastId.PACK_LOAD_FAILURE, component, null);
+			SystemToast.addOrUpdate(
+					Minecraft.getInstance().getToastManager(),
+					SystemToast.SystemToastId.PACK_LOAD_FAILURE,
+					component,
+					null);
 			return true;
 		}
 		String titleStr = result.title();
@@ -53,16 +64,13 @@ public class REICCPlugin implements REIClientPlugin {
 		} else if (titleStr.startsWith("{")) {
 			try {
 				RegistryAccess.Frozen provider = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
-				JsonObject jsonObject = GsonHelper.parse(titleStr, true);
+				JsonObject jsonObject = GSON.fromJson(titleStr, JsonObject.class);
 				if (jsonObject.has("item")) {
 					ItemParser parser = new ItemParser(provider);
-					ItemParser.ItemResult itemResult = parser.parse(new StringReader(jsonObject.get("item").getAsString()));
+					ItemInput itemResult = parser.parse(new StringReader(jsonObject.get("item").getAsString()));
 					icon = new ItemStack(itemResult.item(), 1, itemResult.components());
 				}
-				title = Component.Serializer.fromJson(jsonObject, provider);
-				if (title == null) {
-					title = Component.empty();
-				}
+				title = ComponentSerialization.CODEC.parse(JsonOps.INSTANCE, jsonObject).getOrThrow();
 			} catch (Exception e) {
 				if (icon.isEmpty()) {
 					Minecraft mc = Minecraft.getInstance();
@@ -72,7 +80,7 @@ public class REICCPlugin implements REIClientPlugin {
 							ids,
 							Component.translatable("rei_custom_command.sth-wrong"),
 							Component.literal(e.getLocalizedMessage()));
-					mc.getToasts().addToast(toast);
+					mc.getToastManager().addToast(toast);
 					RoughlyEnoughItemsCore.LOGGER.error("Failed to parse custom command favorite entry title as JSON", e);
 					return false;
 				}
@@ -83,7 +91,7 @@ public class REICCPlugin implements REIClientPlugin {
 		}
 		CustomCommandFavoriteEntry entry = new CustomCommandFavoriteEntry(title, icon, result.commands());
 		ConfigObject.getInstance().getFavoriteEntries().add(entry);
-		if (!Screen.hasControlDown()) {
+		if (!hasControlDown()) {
 			searchField.setText("");
 		}
 		return true;
@@ -94,6 +102,18 @@ public class REICCPlugin implements REIClientPlugin {
 		registry.register(CustomCommandFavoriteEntry.ID, CustomCommandFavoriteEntry.Type.INSTANCE);
 		registry.getOrCrateSection(Component.translatable(CustomCommandFavoriteEntry.TRANSLATION_KEY))
 				.add(CustomCommandFavoriteEntry.DEFAULT);
+	}
+
+	@SuppressWarnings("BooleanMethodIsAlwaysInverted")
+	public static boolean hasControlDown() {
+		if (ON_OSX) {
+			return InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), 343) || InputConstants.isKeyDown(
+					Minecraft.getInstance()
+							.getWindow(), 347);
+		}
+		return InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), 341) || InputConstants.isKeyDown(
+				Minecraft.getInstance()
+						.getWindow(), 345);
 	}
 
 	public static ParsedResult parse(String input) {

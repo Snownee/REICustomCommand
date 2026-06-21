@@ -2,6 +2,7 @@ package snownee.rei_custom_command;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -15,24 +16,27 @@ import me.shedaniel.math.Rectangle;
 import me.shedaniel.rei.api.client.favorites.FavoriteEntry;
 import me.shedaniel.rei.api.client.favorites.FavoriteEntryType;
 import me.shedaniel.rei.api.client.gui.Renderer;
+import me.shedaniel.rei.api.client.gui.compat.GuiGraphics;
 import me.shedaniel.rei.api.client.gui.widgets.Tooltip;
 import me.shedaniel.rei.api.client.gui.widgets.TooltipContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.Style;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
@@ -41,7 +45,7 @@ import net.minecraft.world.item.Items;
 @SuppressWarnings("UnstableApiUsage")
 public class CustomCommandFavoriteEntry extends FavoriteEntry {
 
-	public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath("rei_custom_command", "custom-command");
+	public static final Identifier ID = Identifier.fromNamespaceAndPath("rei_custom_command", "custom-command");
 	public static final String TRANSLATION_KEY = "favorite.section.rei_custom_command";
 	public static final FavoriteEntry DEFAULT = new CustomCommandFavoriteEntry(
 			Component.literal("?"),
@@ -106,23 +110,24 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 					if (lines.isEmpty()) {
 						return;
 					}
-					graphics.pose().pushPose();
-					graphics.pose().translate(bounds.getCenterX(), bounds.getCenterY(), 0);
-					graphics.pose().scale(bounds.getWidth() / 18f, bounds.getHeight() / 18f, 1);
-					graphics.pose().translate(-font.width(lines.getFirst()) / 2f + 0.5f, -3.5f, 0);
+					graphics.pose().pushMatrix();
+					graphics.pose().translate(bounds.getCenterX(), bounds.getCenterY());
+					graphics.pose().scale(bounds.getWidth() / 18f, bounds.getHeight() / 18f);
+					graphics.pose().translate(-font.width(lines.getFirst()) / 2f + 0.5f, -3.5f);
 					graphics.drawString(font, lines.getFirst(), 0, 0, color, false);
-					graphics.pose().popPose();
+					graphics.pose().popMatrix();
 				} else {
-					graphics.pose().pushPose();
-					graphics.pose().translate(bounds.getMinX(), bounds.getMinY(), 0);
-					graphics.pose().scale(bounds.getWidth() / 16f, bounds.getHeight() / 16f, 1);
+					graphics.pose().pushMatrix();
+					graphics.pose().translate(bounds.getMinX(), bounds.getMinY());
+					graphics.pose().scale(bounds.getWidth() / 16f, bounds.getHeight() / 16f);
 					graphics.renderItem(icon, 0, 0);
-					if (!Screen.hasControlDown() && !icon.is(Items.COMMAND_BLOCK) && !icon.is(Items.REPEATING_COMMAND_BLOCK) && !icon.is(
-							Items.CHAIN_COMMAND_BLOCK)) {
-						graphics.pose().scale(0.5f, 0.5f, 1);
-						graphics.renderItem(Items.COMMAND_BLOCK.getDefaultInstance(), 16, 16, 0, 30);
+					if (!REICCPlugin.hasControlDown() && !icon.is(Items.COMMAND_BLOCK) && !icon.is(Items.REPEATING_COMMAND_BLOCK) &&
+							!icon.is(
+									Items.CHAIN_COMMAND_BLOCK)) {
+						graphics.pose().scale(0.5f, 0.5f);
+						graphics.renderItem(Items.COMMAND_BLOCK.getDefaultInstance(), 16, 16);
 					}
-					graphics.pose().popPose();
+					graphics.pose().popMatrix();
 				}
 			}
 
@@ -133,14 +138,14 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 			}
 
 			@Override
-			public boolean equals(Object o) {
-				if (this == o) {
+			public boolean equals(Object obj) {
+				if (this == obj) {
 					return true;
 				}
-				if (o == null || getClass() != o.getClass()) {
+				if (obj == null || getClass() != obj.getClass()) {
 					return false;
 				}
-				return hashCode() == o.hashCode();
+				return hashCode() == obj.hashCode();
 			}
 
 			@Override
@@ -151,8 +156,8 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 	}
 
 	@Override
-	public boolean doAction(int button) {
-		if (button != 0) {
+	public boolean doAction(MouseButtonEvent event) {
+		if (event.button() != 0) {
 			return false;
 		}
 		if (Minecraft.getInstance().player == null) {
@@ -176,7 +181,7 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 	}
 
 	@Override
-	public ResourceLocation getType() {
+	public Identifier getType() {
 		return ID;
 	}
 
@@ -196,19 +201,21 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 		@Override
 		public DataResult<CustomCommandFavoriteEntry> read(CompoundTag object) {
 			List<String> commands;
-			if (object.contains("command", Tag.TAG_STRING)) {
-				commands = List.of(object.getString("command"));
+			if (object.get("command") instanceof StringTag(String value)) {
+				commands = List.of(value);
+			} else if (object.get("commands") instanceof ListTag listTag) {
+				commands = listTag.stream().map(Tag::asString).map(Optional::orElseThrow).toList();
 			} else {
-				ListTag commandsTag = object.getList("commands", Tag.TAG_STRING);
-				commands = commandsTag.stream().map(Tag::getAsString).toList();
+				return DataResult.error(() -> "Cannot create CustomCommandFavoriteEntry!");
 			}
 			Component title = null;
 			ItemStack icon = ItemStack.EMPTY;
 			try {
 				RegistryAccess.Frozen provider = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
-				title = Component.Serializer.fromJson(object.getString("title"), provider);
+				RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, provider);
+				title = ComponentSerialization.CODEC.parse(ops, object.get("title")).getOrThrow();
 				if (object.contains("item")) {
-					icon = ItemStack.parseOptional(provider, object.getCompound("item"));
+					icon = ItemStack.CODEC.parse(ops, object.get("item")).getOrThrow();
 				}
 			} catch (Exception ignored) {
 			}
@@ -235,15 +242,20 @@ public class CustomCommandFavoriteEntry extends FavoriteEntry {
 		@Override
 		public CompoundTag save(CustomCommandFavoriteEntry entry, CompoundTag tag) {
 			RegistryAccess.Frozen provider = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
-			tag.putString("title", Component.Serializer.toJson(entry.title, provider));
+			RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, provider);
+			tag.put("title", ComponentSerialization.CODEC.encodeStart(ops, entry.title).getOrThrow());
 			if (!entry.icon.isEmpty()) {
-				tag.put("item", entry.icon.save(provider));
+				tag.put("item", ItemStack.CODEC.encodeStart(ops, entry.icon).getOrThrow());
 			}
-			ListTag commands = new ListTag();
-			for (String command : entry.commands) {
-				commands.add(StringTag.valueOf(command));
+			if (entry.commands.size() == 1) {
+				tag.putString("command", entry.commands.getFirst());
+			} else {
+				ListTag commands = new ListTag();
+				for (String command : entry.commands) {
+					commands.add(StringTag.valueOf(command));
+				}
+				tag.put("commands", commands);
 			}
-			tag.put("commands", commands);
 			return tag;
 		}
 	}
