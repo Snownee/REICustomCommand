@@ -1,10 +1,26 @@
 pluginManagement {
     repositories {
-        maven { url "https://maven.architectury.dev/" }
-        maven {
-            name = 'Fabric'
-            url = 'https://maven.fabricmc.net/'
-        }
+        maven { url = "https://maven.neoforged.net/releases" }
         gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
+    repositories {
+        maven { url = "https://maven.shedaniel.me/" }
+        maven { url = "https://maven.blamejared.com/" }
+        maven { url = "https://maven.parchmentmc.org" }
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = "Modrinth"
+                    url = "https://api.modrinth.com/maven"
+                }
+            }
+            filter {
+                includeGroup "maven.modrinth"
+            }
+        }
     }
 }
